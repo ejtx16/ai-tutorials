@@ -21,8 +21,6 @@ Claude Code -> Ollama -> Local model
 
 This means you can use models such as `qwen3.5`, `qwen3-coder`, or `gpt-oss:20b`, depending on what your computer can run.
 
-> *Note: You need to have a porwerfull personal computer*
-
 ## Step 1: Install Ollama
 
 1. Go to the Ollama download page:
@@ -72,14 +70,13 @@ The simplest way is to let Ollama launch Claude Code for you:
 ```bash
 ollama launch claude
 ```
-
-Ollama may ask you to choose or download a model.
-
-If you already know which model you want, run:
+### Run it fully Local
 
 ```bash
-ollama launch claude --model qwen3.5
+ollama launch claude --model gpt-oss:20b
 ```
+> *Note: You need to have a porwerfull personal computer*
+
 
 ## Step 4: Choose a Model
 
@@ -101,7 +98,7 @@ Example:
 
 ```bash
 cd path/to/your/project
-ollama launch claude --model qwen3.5
+ollama launch claude --model gpt-oss:20b
 ```
 
 Then ask Claude Code something simple:
