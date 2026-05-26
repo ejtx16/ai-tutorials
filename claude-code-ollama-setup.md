@@ -21,16 +21,7 @@ Claude Code -> Ollama -> Local model
 
 This means you can use models such as `qwen3.5`, `qwen3-coder`, or `gpt-oss:20b`, depending on what your computer can run.
 
-## Before You Start
-
-You need:
-
-- A Windows, macOS, or Linux computer
-- Internet connection for installation and model downloads
-- Terminal access:
-  - Windows: PowerShell
-  - macOS/Linux: Terminal
-- Enough RAM and storage for local models
+> *Note: You need to have a porwerfull personal computer*
 
 ## Step 1: Install Ollama
 
@@ -123,115 +114,6 @@ Or:
 
 ```text
 Find bugs in this codebase, but do not edit files yet.
-```
-
-## Step 6: Manual Setup Option
-
-If `ollama launch claude` does not work, you can manually point Claude Code to Ollama.
-
-### macOS, Linux, or WSL
-
-```bash
-export ANTHROPIC_AUTH_TOKEN=ollama
-export ANTHROPIC_API_KEY=""
-export ANTHROPIC_BASE_URL=http://localhost:11434
-claude --model qwen3.5
-```
-
-### Windows PowerShell
-
-```powershell
-$env:ANTHROPIC_AUTH_TOKEN="ollama"
-$env:ANTHROPIC_API_KEY=""
-$env:ANTHROPIC_BASE_URL="http://localhost:11434"
-claude --model qwen3.5
-```
-
-These variables tell Claude Code to use Ollama instead of the default Anthropic API.
-
-## Step 7: Run a One-Time Prompt
-
-You can run Claude Code without opening the full interactive chat.
-
-Example:
-
-```bash
-ollama launch claude --model qwen3.5 --yes -- -p "Explain how this repository works."
-```
-
-This is useful for quick checks or scripts.
-
-## Common Problems
-
-### `claude` command is not found
-
-Claude Code may not be installed correctly, or your terminal path may not be updated.
-
-Try closing and reopening your terminal, then run:
-
-```bash
-claude --version
-```
-
-### Ollama is not running
-
-Start Ollama from your apps menu, or run:
-
-```bash
-ollama serve
-```
-
-Then try again.
-
-### The model is too slow
-
-Use a smaller local model, or pick a lighter option from the model list when Ollama prompts you.
-
-### Claude Code forgets too much context
-
-Claude Code works best with models that support a large context window. Ollama recommends using at least 32K tokens, and its Claude Code guide mentions 64K tokens for best results.
-
-## Beginner Tips
-
-- Start with small requests.
-- Ask Claude Code to explain before editing.
-- Review file changes before accepting them.
-- Use Git so you can undo mistakes.
-- Local models keep your requests on your computer.
-
-## Quick Command Summary
-
-Install Claude Code on Windows:
-
-```powershell
-irm https://claude.ai/install.ps1 | iex
-```
-
-Install Claude Code on macOS/Linux:
-
-```bash
-curl -fsSL https://claude.ai/install.sh | bash
-```
-
-Run Claude Code with Ollama:
-
-```bash
-ollama launch claude
-```
-
-Run with a specific model:
-
-```bash
-ollama launch claude --model qwen3.5
-```
-
-Manual setup:
-
-```bash
-export ANTHROPIC_AUTH_TOKEN=ollama
-export ANTHROPIC_API_KEY=""
-export ANTHROPIC_BASE_URL=http://localhost:11434
-claude --model qwen3.5
 ```
 
 ## Simple Recommended Path
