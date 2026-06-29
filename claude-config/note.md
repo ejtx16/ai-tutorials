@@ -1,0 +1,1 @@
+You can write your own CLAUDE.md based on your preferences. A good one is short and uses general rules, so it can guide your workflow across any codebase. Note that CLAUDE.md can also serve as memory storage for your AI.
