@@ -22,13 +22,13 @@ Guidance for Claude Code working with code in this repo.
 - No external libraries unless absolutely necessary.
 - Use project dependency file for correct versions.
 - Avoid redundancy unless improves usability.
-- Don't auto-commit activity logs and docs.
 
 ## Version Control
 
 - Commit after significant changes, clear messages.
 - Keep commits focused, atomic.
 - No auto-push any branch.
+- Don't auto-commit activity logs and docs.
 - Access only these repositories: <REPO_ALLOWLIST>
 
 ## AI Restrictions
