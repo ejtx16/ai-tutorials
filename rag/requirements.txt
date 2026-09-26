@@ -1,0 +1,7 @@
+langchain
+langchain-text-splitters
+langchain-groq
+langchain-huggingface
+sentence-transformers
+pypdf
+python-dotenv
