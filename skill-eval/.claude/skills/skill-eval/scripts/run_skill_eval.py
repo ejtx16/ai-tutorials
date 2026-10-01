@@ -36,6 +36,10 @@ FILE_EXTS = set(
     "py js mjs cjs ts tsx jsx json jsonl md mdx txt csv tsv yml yaml toml ini cfg conf env lock html htm css scss "
     "sh bash ps1 bat cmd go rs java kt kts rb php c h cc cpp hpp cs swift sql xml svg ipynb vue svelte gradle "
     "tf proto graphql dockerfile pdf docx xlsx pptx png jpg jpeg gif".split())
+MIME_RE = re.compile(r"(application|audio|font|image|message|model|multipart|text|video)/[\w.+-]+", re.I)
+# where agents install personal skills; checked for cited skill files and for --isolated injection
+SKILL_HOMES = ("~/.claude/skills", "~/.copilot/skills", "~/.agents/skills")
+PROJECT_SKILL_DIRS = (".claude/skills", ".github/skills", ".agents/skills")
 
 GRADER_SYSTEM = (
     "You are a strict grader checking an AI answer for factual accuracy against reference material. "
@@ -85,6 +89,9 @@ def run_claude(prompt: str, workdir: Path, args, max_turns: int, trace_path: Pat
            "--max-turns", str(max_turns)]
     if args.model:
         cmd += ["--model", args.model]
+    if args.isolated:
+        # project settings only: no user settings, hooks, plugins, personal skills or user MCP servers
+        cmd += ["--setting-sources", "project", "--strict-mcp-config"]
     proc = subprocess.run(cmd, cwd=workdir, stdin=subprocess.DEVNULL, capture_output=True,
                           text=True, encoding="utf-8", timeout=args.timeout)
     trace_path.write_text(proc.stdout, encoding="utf-8")
@@ -177,9 +184,12 @@ def cited_paths(answer: str, roots: tuple[str, ...] = ()) -> set[str]:
             if m:
                 token = token.replace("\\", "/")[m.end():]
                 break
-        if "://" in token or token.startswith("-") or re.fullmatch(r"/[\w-]+", token):
-            continue  # URLs, CLI flags, slash commands like `/mcp`
-        ext = token.rsplit(".", 1)[-1].lower() if "." in token else ""
+        if ("://" in token or token.startswith(("-", "@")) or MIME_RE.fullmatch(token)
+                or re.search(r"/:|[{}<>]", token)):
+            continue  # URLs, CLI flags, scoped packages, MIME types, route params like `/users/:id`
+        ext = file_ext(token)
+        if token.startswith("/") and ext not in FILE_EXTS:
+            continue  # routes and slash commands like `/api/users`, `/mcp`
         # bare names need a real file extension, so `pytest.approx` / `json.loads` aren't taken as files
         if "/" in token or "\\" in token or (re.search(r"\w\.\w+$", token) and ext in FILE_EXTS):
             if not re.search(r"\(|\)|=|\$|\*", token):  # skip code like foo.bar() or globs
@@ -187,11 +197,31 @@ def cited_paths(answer: str, roots: tuple[str, ...] = ()) -> set[str]:
     return paths
 
 
-def path_exists(repo: Path, rel: str) -> bool:
-    if (repo / rel).exists():
+def file_ext(path: str) -> str:
+    name = path.replace("\\", "/").rsplit("/", 1)[-1]
+    return name.rsplit(".", 1)[-1].lower() if "." in name else ""
+
+
+def installed_skill_dirs(skill: str) -> list[Path]:
+    return [p for home in SKILL_HOMES if (p := Path(home).expanduser() / skill).is_dir()]
+
+
+def is_checkable(rel: str, bases: list[Path]) -> bool:
+    """Extensionless tokens like `origin/main` or `owner/repo` are usually git refs or repo names, not files:
+    only check them when their first segment exists."""
+    if file_ext(rel) in FILE_EXTS or Path(rel).expanduser().is_absolute():
+        return True
+    return any((base / rel.split("/")[0]).exists() for base in bases)
+
+
+def path_exists(bases: list[Path], rel: str) -> bool:
+    path = Path(rel).expanduser()
+    if path.is_absolute():
+        return path.exists()
+    if any((base / rel).exists() for base in bases):
         return True
     # tolerate cited paths relative to a subfolder, or bare filenames
-    return any(p.as_posix().endswith("/" + rel) for p in repo.rglob(Path(rel).name))
+    return any(p.as_posix().endswith("/" + rel) for base in bases for p in base.rglob(Path(rel).name))
 
 
 def read_reference(repo: Path, refs: list[str]) -> str:
@@ -226,12 +256,20 @@ def evaluate_case(case: dict, skill: str, repo: Path, args, trace_dir: Path) -> 
         created = {f: (workdir / f).exists() for f in case.get("expect_files", [])}
         # agents sometimes cite absolute paths in the run dir; the temp dir name is unique, so match on it
         roots = (repo.as_posix(),) if args.in_place else (f"{Path(tmp).name}/repo", repo.as_posix())
+        should = case.get("should_trigger")
+        if case.get("check_paths", should is not False):
+            # check against the run dir too: the answer may cite files the run created or the injected skill
+            bases = list(dict.fromkeys([workdir, repo, *installed_skill_dirs(skill)]
+                                       + ([Path(args.skill_dir).resolve()] if args.skill_dir else [])))
+            bad_paths = sorted(p for p in cited_paths(out["answer"], roots)
+                               if is_checkable(p, bases) and not path_exists(bases, p))
+        else:
+            bad_paths = None
 
     calls, answer = out["calls"], out["answer"]
     skill_idx = [i for i, c in enumerate(calls) if is_skill_call(c, skill)]
     checks, notes = {}, {}
 
-    should = case.get("should_trigger")
     if should is not None:
         checks["trigger_match"] = bool(skill_idx) == should
         if should:
@@ -252,11 +290,10 @@ def evaluate_case(case: dict, skill: str, repo: Path, args, trace_dir: Path) -> 
         checks["forbidden"] = not found
         if found:
             notes["forbidden_found"] = found
-    if case.get("check_paths", should is not False):
-        bad = sorted(p for p in cited_paths(answer, roots) if not path_exists(repo, p))
-        checks["paths_exist"] = not bad
-        if bad:
-            notes["hallucinated_paths"] = bad
+    if bad_paths is not None:
+        checks["paths_exist"] = not bad_paths
+        if bad_paths:
+            notes["hallucinated_paths"] = bad_paths
     if created:
         checks["files_created"] = all(created.values())
         if not all(created.values()):
@@ -294,6 +331,9 @@ def main() -> None:
     ap.add_argument("--timeout", type=int, default=600, help="seconds per run")
     ap.add_argument("--in-place", action="store_true",
                     help="run in the repo itself instead of a temp copy (large repos; skill may modify files)")
+    ap.add_argument("--isolated", action="store_true",
+                    help="claude only: ignore user settings, hooks, plugins, personal skills and MCP servers so "
+                         "results don't depend on this machine (personal skills are injected into the copy)")
     ap.add_argument("--out", default="runs")
     args = ap.parse_args()
     args.grader = args.grader or args.runner
@@ -301,6 +341,19 @@ def main() -> None:
     spec = json.loads(Path(args.cases).read_text(encoding="utf-8"))
     skill = args.skill or spec["skill"]
     repo = Path(args.repo or spec.get("repo") or ".").resolve()
+    if args.isolated and args.runner == "copilot":
+        print("note: --isolated only affects the claude runner; copilot still loads ~/.copilot skills, "
+              "plugins and MCP servers")
+    if args.isolated and not args.skill_dir and not any((repo / d / skill).is_dir() for d in PROJECT_SKILL_DIRS):
+        # isolated runs can't see personal skills, so copy the installed one into the repo copy
+        homes = installed_skill_dirs(skill)
+        if homes and not args.in_place:
+            args.skill_dir = str(homes[0])
+            print(f"note: injecting personal skill from {homes[0]}")
+        else:
+            print(f"WARNING: skill '{skill}' is not in the repo"
+                  + (" and --in-place can't inject it" if homes else " or a personal skills folder")
+                  + "; pass --skill-dir (plugin skills too) or it will never trigger")
     cases = [c for c in spec["cases"] if not args.only or c["id"] in args.only]
     stamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
     out_dir = Path(args.out) / skill / f"{stamp}-{args.runner}"

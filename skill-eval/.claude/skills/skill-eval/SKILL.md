@@ -64,7 +64,9 @@ Prefer checks in this order:
 ```bash
 python <this-skill-dir>/scripts/run_skill_eval.py --cases evals/<skill>.cases.json --repo <reference-repo> --runner <claude|copilot>
 ```
-Useful flags: `--only id1 id2` (rerun specific cases), `--skill-dir <path>` (inject a skill not installed in the repo), `--model` / `--grader-model`, `--max-turns N` (claude only, default 10), `--timeout S` (per run, default 600), `--in-place` (big repos; skips the temp copy, but the skill may modify files; warn the user first).
+Useful flags: `--only id1 id2` (rerun specific cases), `--skill-dir <path>` (inject a skill not installed in the repo), `--model` / `--grader-model`, `--max-turns N` (claude only, default 10), `--timeout S` (per run, default 600), `--in-place` (big repos; skips the temp copy, but the skill may modify files; warn the user first), `--isolated` (claude only; see below).
+
+**Use `--isolated` for results that don't depend on this machine.** Without it, the target run loads the user's own settings, hooks, plugins, personal skills and MCP servers. These can change the answer style or compete with the target skill for triggering. `--isolated` loads project settings only. A personal skill (`~/.claude/skills/<skill>`, etc.) is injected into the repo copy automatically. A plugin skill needs `--skill-dir`. Copilot has no equivalent option, so the flag is ignored there.
 
 Each case runs in a **temp copy** of the repo (without `.git`, `node_modules`, etc.), so the reference is never modified. The copilot runner uses `--allow-all-tools` (required for headless mode), which is another reason not to use `--in-place` casually.
 
@@ -137,7 +139,7 @@ An **empty trace on every case** means the harness could not run the CLI (not in
 | `should_trigger` | `true`/`false` → trigger checks; omit to skip them |
 | `chat_only` | adds `no_file_writes` check |
 | `must_include` / `must_not_include` | case-insensitive regexes over the final answer |
-| `check_paths` | default on for positive cases; set `false` if the answer legitimately cites non-existent paths |
+| `check_paths` | default on for positive cases. Cited paths are checked against the run's repo copy (so files the run created count), the reference repo, and the target skill's folder. URLs, routes (`/api/users/:id`), MIME types, `@scope/pkg` and extensionless tokens like `origin/main` whose first segment doesn't exist are skipped. Set `false` if the answer legitimately cites non-existent paths |
 | `expect_files` | paths (relative to repo) that must exist after the run |
 | `reference` | repo-relative files/globs given to the rubric grader (each truncated to 20k chars) |
 | `rubric` | criteria the grader checks against `reference` only |

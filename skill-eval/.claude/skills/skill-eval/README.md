@@ -107,6 +107,7 @@ Full logs are saved in `runs/<skill>/<timestamp>/`.
 ## Good to know
 
 - Tests run on a **temporary copy** of your repo. Your files are safe.
+- Add `--isolated` (Claude only) so your own plugins, hooks and MCP servers don't change the results.
 - Each test case costs roughly $0.10–0.50 on Claude.
 - Start with 4–6 cases. Add a new case whenever you find a real bug.
 - Every case fails with an empty answer? The CLI isn't installed or logged in.
