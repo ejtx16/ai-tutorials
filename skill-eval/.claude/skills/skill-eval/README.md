@@ -7,48 +7,15 @@ It runs your skill on a few test prompts, then checks the answers against your r
 ## How it works
 
 ```mermaid
-%%{init: {"theme": "base", "themeVariables": {
-  "background": "#ffffff",
-  "primaryColor": "#ffffff",
-  "primaryTextColor": "#000000",
-  "primaryBorderColor": "#000000",
-  "lineColor": "#000000",
-  "secondaryColor": "#ffffff",
-  "tertiaryColor": "#ffffff",
-  "clusterBkg": "#ffffff",
-  "clusterBorder": "#000000",
-  "edgeLabelBackground": "#ffffff",
-  "fontFamily": "arial, sans-serif",
-  "fontSize": "14px"
-}}}%%
+%%{init: {"theme": "neutral"}}%%
 flowchart TD
-    A(["You: 'test my X skill'"]) --> B("1 · Pick target skill<br/>+ reference repo")
-    B --> C("2 · Write cases file<br/>evals/X.cases.json")
-    C --> D("3 · Run run_skill_eval.py")
-
-    subgraph LOOP ["For each test case"]
-        direction TB
-        E("Copy repo to<br/>temp folder") --> F("Run skill headless<br/>claude -p / copilot -p")
-        F --> G("Save trace<br/>case.jsonl")
-        G --> H("Run checks<br/>trigger · facts · paths<br/>files · rubric")
-    end
-
-    D --> E
-    H --> I("Scores<br/>trigger/process + accuracy<br/>→ summary.json")
-    I --> J{"All pass?"}
-    J -- "Yes" --> K("Add held-out +<br/>near-miss cases")
-    K --> L(["Done"])
-    J -- "No" --> M{"Expectation<br/>wrong?"}
-    M -- "Yes" --> N("Fix the case")
-    M -- "No" --> O("Fix the skill<br/>SKILL.md")
-    N --> D
-    O --> D
-
-    classDef box fill:#ffffff,stroke:#000000,stroke-width:1.5px,color:#000000
-    classDef ends fill:#000000,stroke:#000000,color:#ffffff
-    class B,C,D,E,F,G,H,I,J,K,M,N,O box
-    class A,L ends
-    style LOOP fill:#ffffff,stroke:#000000,stroke-width:1px,stroke-dasharray:5 4
+    A(["Test my X skill"]) --> B("Write test cases<br/>evals/X.cases.json")
+    B --> C("Run each case<br/>on a temp copy of the repo")
+    C --> D("Check the answers<br/>trigger · facts · paths · files")
+    D --> E{"All pass?"}
+    E -- "No" --> F("Fix the case or the skill")
+    F --> C
+    E -- "Yes" --> G(["Done"])
 ```
 
 ## What it checks
