@@ -42,11 +42,19 @@ Establish, asking the user only if not inferable:
 - **Target skill**: name, and where its `SKILL.md` lives. Project: `.claude/skills/`, `.github/skills/`, `.agents/skills/`. Personal: `~/.claude/skills/`, `~/.copilot/skills/`, `~/.agents/skills/`. Or a plugin. Both Claude Code and Copilot read `.claude/skills/` in the project.
 - **Reference**: the repo / docs / data the output must agree with. This becomes `--repo`.
 - **What "accurate" means** for this skill: correct facts? correct files cited? generated files exist and are valid?
+- **Eval dir**: where the eval lives. Default: the project root (cwd). Use whatever folder the user names (e.g. `evals/`, `tests/skills/`, a path outside the repo). Layout:
+
+```
+<eval-dir>/
+  cases/<skill>.cases.json                      # you write this
+  runs/<skill>/<timestamp>-<runner>/            # the script writes this
+    <case-id>.jsonl   summary.json   report.html
+```
 
 Read the target `SKILL.md` fully so cases test what the skill claims to do.
 
 ### 2. Write the cases file — grounded, never invented
-Create `evals/<skill>.cases.json` (format below). Start small: **4–6 cases**:
+Create `<eval-dir>/cases/<skill>.cases.json` (format below). Its `repo` is relative to the eval dir. Start small: **4–6 cases**:
 - 1–2 **explicit** (prompt names the skill)
 - 1–2 **implicit** (matches the description without naming it)
 - 1 **negative control** (similar topic, must NOT trigger)
@@ -62,8 +70,12 @@ Prefer checks in this order:
 
 ### 3. Run
 ```bash
-python <this-skill-dir>/scripts/run_skill_eval.py --cases evals/<skill>.cases.json --repo <reference-repo> --runner <claude|copilot>
+python <this-skill-dir>/scripts/run_skill_eval.py --cases <eval-dir>/cases/<skill>.cases.json --runner <claude|copilot>
+# or by name:
+python <this-skill-dir>/scripts/run_skill_eval.py --cases <skill> --eval-dir <eval-dir>
 ```
+The eval dir is taken from `--eval-dir`, else `$SKILL_EVAL_DIR`, else the folder containing `cases/` (when the cases file sits in one), else cwd. Runs go to `<eval-dir>/runs/` (override with `--out`). The eval's `cases/` and `runs/` folders are left out of the repo copy so the skill can't read the expected answers. Pass `--repo` to override the reference repo (relative to cwd).
+
 Useful flags: `--only id1 id2` (rerun specific cases), `--skill-dir <path>` (inject a skill not installed in the repo), `--model` / `--grader-model`, `--max-turns N` (claude only, default 10), `--timeout S` (per run, default 600), `--in-place` (big repos; skips the temp copy, but the skill may modify files; warn the user first), `--isolated` (claude only; see below).
 
 **Use `--isolated` for results that don't depend on this machine.** Without it, the target run loads the user's own settings, hooks, plugins, personal skills and MCP servers. These can change the answer style or compete with the target skill for triggering. `--isolated` loads project settings only. A personal skill (`~/.claude/skills/<skill>`, etc.) is injected into the repo copy automatically. A plugin skill needs `--skill-dir`. Copilot has no equivalent option, so the flag is ignored there.
@@ -72,10 +84,10 @@ Each case runs in a **temp copy** of the repo (without `.git`, `node_modules`, e
 
 Cost: Claude ≈ $0.10–0.50 per case plus ~$0.01 per rubric grade. Copilot ≈ 1–2 premium requests per case plus 1 per rubric grade. Tell the user the estimate before running more than ~10 cases.
 
-Output: table of PASS/FAIL/`-` per check, a **trigger/process score** and a separate **accuracy score**, failure details, and `runs/<skill>/<timestamp>-<runner>/` with one JSONL trace per case + `summary.json`.
+Output: table of PASS/FAIL/`-` per check, a **trigger/process score** and a separate **accuracy score**, failure details, and `<eval-dir>/runs/<skill>/<timestamp>-<runner>/` with one JSONL trace per case, `summary.json`, and `report.html` (scores, check matrix, per-case prompt/answer/notes, trace links; give the user its path). Rebuild a report for an older run with `--report <run-dir>`.
 
 ### 4. Diagnose failures
-Read the notes and, when unclear, the case's trace (`runs/.../<id>.jsonl`). Claude traces: `assistant` events hold tool calls, the `result` event holds the final answer. Copilot traces: `tool.execution_start` events hold tool calls (skill loads show as tool `skill`), `assistant.message` with `phase: "final_answer"` holds the answer.
+Read the notes and, when unclear, the case's trace (`<eval-dir>/runs/.../<id>.jsonl`) or `report.html`. Claude traces: `assistant` events hold tool calls, the `result` event holds the final answer. Copilot traces: `tool.execution_start` events hold tool calls (skill loads show as tool `skill`), `assistant.message` with `phase: "final_answer"` holds the answer.
 
 | Failing check | Usually means | Fix where |
 |---|---|---|
