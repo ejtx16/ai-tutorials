@@ -9,7 +9,7 @@ It runs your skill on a few test prompts, then checks the answers against your r
 ```mermaid
 %%{init: {"theme": "neutral"}}%%
 flowchart TD
-    A(["Test my X skill"]) --> B("Write test cases<br/>evals/X.cases.json")
+    A(["Test my X skill"]) --> B("Write test cases<br/>cases/X.cases.json")
     B --> C("Run each case<br/>on a temp copy of the repo")
     C --> D("Check the answers<br/>trigger · facts · paths · files")
     D --> E{"All pass?"}
@@ -30,7 +30,7 @@ flowchart TD
 
 **1. You need:** Python 3.9+ and the `claude` CLI (logged in). Or `copilot` CLI.
 
-**2. Write a test file**, e.g. `evals/my-skill.cases.json`:
+**2. Write a test file** in a `cases/` folder, e.g. `cases/my-skill.cases.json`:
 
 ```json
 {
@@ -57,8 +57,35 @@ Tip: only add facts to `must_include` that you've confirmed are in your code.
 **3. Run it:**
 
 ```bash
-python .claude/skills/skill-eval/scripts/run_skill_eval.py --cases evals/my-skill.cases.json
+python .claude/skills/skill-eval/scripts/run_skill_eval.py --cases cases/my-skill.cases.json
 ```
+
+Results land next to `cases/`:
+
+```
+cases/
+  my-skill.cases.json
+runs/
+  my-skill/
+    20261002-011153-claude/
+      basic.jsonl
+      should-not-run.jsonl
+      report.html      <- open this
+      summary.json
+```
+
+The folder can be anywhere. `cases/` and `runs/` always sit side by side in the **eval dir**:
+
+```bash
+# cases file inside a cases/ folder -> runs/ goes next to it
+python .../run_skill_eval.py --cases tests/skills/cases/my-skill.cases.json
+
+# or name the eval dir and pass just the skill name
+python .../run_skill_eval.py --cases my-skill --eval-dir tests/skills
+export SKILL_EVAL_DIR=~/skill-evals   # same, set once
+```
+
+`"repo"` in the cases file is relative to the eval dir.
 
 Or just ask Claude: *"test my my-skill skill"*.
 
@@ -69,7 +96,7 @@ You get a table of PASS / FAIL per check plus two scores:
 - **trigger/process:** did the skill run at the right times?
 - **accuracy:** were the answers correct?
 
-Full logs are saved in `runs/<skill>/<timestamp>/`.
+Open `report.html` in the run folder for the full picture: scores, a pass/fail grid, and each case's prompt, answer and failure notes. Raw logs (`.jsonl`) and `summary.json` sit next to it. Rebuild a report with `--report runs/<skill>/<run>`.
 
 ## Good to know
 
